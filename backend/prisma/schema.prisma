@@ -1,0 +1,615 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Usuario (Entrenadores y Deportistas)
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  avatar    String?
+  role      UserRole @default(ATHLETE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Perfil del usuario
+  profile UserProfile?
+
+  // Relaciones como entrenador
+  coachingRelations CoachAthlete[] @relation("Coach")
+  
+  // Relaciones como deportista
+  athleteRelations CoachAthlete[] @relation("Athlete")
+
+  // Entrenamientos creados (como entrenador)
+  createdWorkouts Workout[] @relation("WorkoutCreator")
+
+  // Entrenamientos asignados (como deportista)
+  assignedWorkouts WorkoutAssignment[]
+
+  // Actividades realizadas
+  activities Activity[]
+
+  // Feedback dado (como entrenador)
+  feedbackGiven Feedback[] @relation("FeedbackGiver")
+
+  // Feedback recibido (como deportista)
+  feedbackReceived Feedback[] @relation("FeedbackReceiver")
+
+  // Mensajes enviados
+  sentMessages Message[] @relation("MessageSender")
+
+  // Mensajes recibidos
+  receivedMessages Message[] @relation("MessageReceiver")
+
+  // Notificaciones
+  notifications Notification[]
+
+  // Integraciones externas
+  integrations UserIntegration[]
+
+  @@map("users")
+}
+
+// Perfil extendido del usuario
+model UserProfile {
+  id       String @id @default(cuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Información personal
+  dateOfBirth DateTime?
+  gender      Gender?
+  height      Float? // en cm
+  weight      Float? // en kg
+  timezone    String @default("UTC")
+  language    String @default("es")
+  
+  // Información deportiva
+  sportTypes     String[] // Tipos de deporte que practica
+  fitnessLevel   FitnessLevel @default(BEGINNER)
+  goals          String[] // Objetivos del deportista
+  
+  // Métricas de salud
+  restingHR      Int? // Frecuencia cardíaca en reposo
+  maxHR          Int? // Frecuencia cardíaca máxima
+  vo2Max         Float?
+  
+  // Configuración
+  isPublic       Boolean @default(false)
+  allowMessages  Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+// Relación Entrenador-Deportista
+model CoachAthlete {
+  id       String @id @default(cuid())
+  coachId  String
+  athleteId String
+  
+  coach    User @relation("Coach", fields: [coachId], references: [id], onDelete: Cascade)
+  athlete  User @relation("Athlete", fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  status    RelationStatus @default(PENDING)
+  startDate DateTime       @default(now())
+  endDate   DateTime?
+  
+  // Configuración de la relación
+  canViewActivities Boolean @default(true)
+  canCreateWorkouts Boolean @default(true)
+  canSendMessages   Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([coachId, athleteId])
+  @@map("coach_athletes")
+}
+
+// Plantilla de entrenamiento
+model WorkoutTemplate {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  tags        String[]
+  
+  // Estructura del entrenamiento
+  exercises   ExerciseTemplate[]
+  
+  // Metadatos
+  estimatedDuration Int? // en minutos
+  difficulty        DifficultyLevel @default(MEDIUM)
+  equipment         String[]
+  
+  // Creador
+  creatorId String
+  creator   User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  // Uso
+  isPublic  Boolean @default(false)
+  usageCount Int    @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("workout_templates")
+}
+
+// Ejercicio dentro de una plantilla
+model ExerciseTemplate {
+  id          String @id @default(cuid())
+  templateId  String
+  template    WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?
+  category    ExerciseCategory
+  
+  // Configuración del ejercicio
+  sets        Int?
+  reps        Int?
+  duration    Int? // en segundos
+  distance    Float? // en metros
+  weight      Float? // en kg
+  restTime    Int? // en segundos
+  
+  // Orden en el entrenamiento
+  order       Int
+  
+  // Instrucciones específicas
+  instructions String?
+  videoUrl     String?
+  imageUrl     String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exercise_templates")
+}
+
+// Entrenamiento planificado
+model Workout {
+  id          String @id @default(cuid())
+  title       String
+  description String?
+  
+  // Planificación
+  scheduledDate DateTime
+  estimatedDuration Int? // en minutos
+  
+  // Creador (entrenador)
+  creatorId String
+  creator   User   @relation("WorkoutCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  // Plantilla base (opcional)
+  templateId String?
+  template   WorkoutTemplate? @relation(fields: [templateId], references: [id])
+  
+  // Ejercicios específicos
+  exercises WorkoutExercise[]
+  
+  // Asignaciones a deportistas
+  assignments WorkoutAssignment[]
+  
+  // Estado
+  status WorkoutStatus @default(PLANNED)
+  
+  // Metadatos
+  tags       String[]
+  notes      String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("workouts")
+}
+
+// Ejercicio específico en un entrenamiento
+model WorkoutExercise {
+  id        String @id @default(cuid())
+  workoutId String
+  workout   Workout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?
+  category    ExerciseCategory
+  
+  // Configuración específica
+  sets        Int?
+  reps        Int?
+  duration    Int? // en segundos
+  distance    Float? // en metros
+  weight      Float? // en kg
+  restTime    Int? // en segundos
+  intensity   IntensityZone?
+  
+  // Orden en el entrenamiento
+  order       Int
+  
+  // Instrucciones específicas
+  instructions String?
+  videoUrl     String?
+  imageUrl     String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("workout_exercises")
+}
+
+// Asignación de entrenamiento a deportista
+model WorkoutAssignment {
+  id        String @id @default(cuid())
+  workoutId String
+  athleteId String
+  
+  workout Workout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  athlete User    @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  // Estado de la asignación
+  status      AssignmentStatus @default(ASSIGNED)
+  completedAt DateTime?
+  
+  // Notas específicas para este deportista
+  notes String?
+  
+  // Actividad resultante (si se completó)
+  activityId String?
+  activity   Activity? @relation(fields: [activityId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workoutId, athleteId])
+  @@map("workout_assignments")
+}
+
+// Actividad realizada (entrenamiento completado)
+model Activity {
+  id       String @id @default(cuid())
+  athleteId String
+  athlete   User   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  // Información básica
+  title       String
+  description String?
+  activityType ActivityType
+  
+  // Tiempo y fecha
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int? // en segundos
+  
+  // Métricas generales
+  distance       Float? // en metros
+  calories       Int?
+  avgHeartRate   Int?
+  maxHeartRate   Int?
+  avgPace        Float? // en segundos por km
+  avgSpeed       Float? // en km/h
+  elevationGain  Float? // en metros
+  
+  // Datos GPS
+  hasGps      Boolean @default(false)
+  gpsData     Json? // Puntos GPS y métricas detalladas
+  
+  // Archivos
+  originalFile String? // Ruta al archivo original (GPX, TCX, FIT)
+  
+  // Relación con entrenamiento planificado
+  workoutAssignments WorkoutAssignment[]
+  
+  // Feedback recibido
+  feedback Feedback[]
+  
+  // Métricas detalladas
+  metrics ActivityMetrics?
+  
+  // Metadatos
+  source      ActivitySource @default(MANUAL)
+  isPublic    Boolean @default(false)
+  tags        String[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("activities")
+}
+
+// Métricas detalladas de una actividad
+model ActivityMetrics {
+  id         String @id @default(cuid())
+  activityId String @unique
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  // Zonas de frecuencia cardíaca (tiempo en segundos)
+  hrZone1 Int @default(0)
+  hrZone2 Int @default(0)
+  hrZone3 Int @default(0)
+  hrZone4 Int @default(0)
+  hrZone5 Int @default(0)
+  
+  // Zonas de potencia (si aplica)
+  powerZone1 Int @default(0)
+  powerZone2 Int @default(0)
+  powerZone3 Int @default(0)
+  powerZone4 Int @default(0)
+  powerZone5 Int @default(0)
+  
+  // Métricas de potencia
+  avgPower    Int?
+  maxPower    Int?
+  normalizedPower Int?
+  
+  // Métricas de cadencia
+  avgCadence  Int?
+  maxCadence  Int?
+  
+  // Métricas de temperatura
+  avgTemperature Float?
+  maxTemperature Float?
+  
+  // Esfuerzo percibido
+  rpe Int? // Rating of Perceived Exertion (1-10)
+  
+  // Carga de entrenamiento
+  trainingLoad Float?
+  tss          Float? // Training Stress Score
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("activity_metrics")
+}
+
+// Feedback de entrenador a deportista
+model Feedback {
+  id         String @id @default(cuid())
+  activityId String
+  giverId    String
+  receiverId String
+  
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  giver    User     @relation("FeedbackGiver", fields: [giverId], references: [id], onDelete: Cascade)
+  receiver User     @relation("FeedbackReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  // Contenido del feedback
+  content String
+  rating  Int? // Calificación del 1 al 5
+  
+  // Categorías de feedback
+  categories FeedbackCategory[]
+  
+  // Estado
+  isRead Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("feedback")
+}
+
+// Mensajes entre usuarios
+model Message {
+  id         String @id @default(cuid())
+  senderId   String
+  receiverId String
+  
+  sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  // Contenido
+  content String
+  type    MessageType @default(TEXT)
+  
+  // Archivos adjuntos
+  attachments String[]
+  
+  // Estado
+  isRead   Boolean @default(false)
+  readAt   DateTime?
+  
+  // Respuesta a otro mensaje
+  replyToId String?
+  replyTo   Message? @relation("MessageReply", fields: [replyToId], references: [id])
+  replies   Message[] @relation("MessageReply")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("messages")
+}
+
+// Notificaciones del sistema
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Contenido
+  title   String
+  content String
+  type    NotificationType
+  
+  // Datos adicionales
+  data Json?
+  
+  // Estado
+  isRead Boolean @default(false)
+  readAt DateTime?
+  
+  // Programación
+  scheduledFor DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+}
+
+// Integraciones externas (Strava, Garmin, etc.)
+model UserIntegration {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Tipo de integración
+  provider IntegrationProvider
+  
+  // Credenciales (encriptadas)
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  
+  // Configuración
+  isActive     Boolean @default(true)
+  syncSettings Json? // Configuración específica de sincronización
+  
+  // Última sincronización
+  lastSyncAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@map("user_integrations")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  COACH
+  ATHLETE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum FitnessLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ELITE
+}
+
+enum RelationStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+  EXTREME
+}
+
+enum ExerciseCategory {
+  CARDIO
+  STRENGTH
+  FLEXIBILITY
+  BALANCE
+  SPORTS_SPECIFIC
+  RECOVERY
+  WARM_UP
+  COOL_DOWN
+}
+
+enum IntensityZone {
+  ZONE1 // Recuperación activa
+  ZONE2 // Aeróbico base
+  ZONE3 // Aeróbico
+  ZONE4 // Umbral
+  ZONE5 // VO2 Max
+}
+
+enum WorkoutStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  CANCELLED
+}
+
+enum ActivityType {
+  RUNNING
+  CYCLING
+  SWIMMING
+  STRENGTH_TRAINING
+  YOGA
+  PILATES
+  CROSSFIT
+  HIKING
+  WALKING
+  OTHER
+}
+
+enum ActivitySource {
+  MANUAL
+  STRAVA
+  GARMIN
+  POLAR
+  SUUNTO
+  FILE_UPLOAD
+}
+
+enum FeedbackCategory {
+  TECHNIQUE
+  PERFORMANCE
+  MOTIVATION
+  RECOVERY
+  NUTRITION
+  GENERAL
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  VOICE
+}
+
+enum NotificationType {
+  WORKOUT_ASSIGNED
+  WORKOUT_COMPLETED
+  FEEDBACK_RECEIVED
+  MESSAGE_RECEIVED
+  INTEGRATION_SYNC
+  SYSTEM
+}
+
+enum IntegrationProvider {
+  STRAVA
+  GARMIN
+  POLAR
+  SUUNTO
+  FITBIT
+}
