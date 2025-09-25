@@ -1,5 +1,5 @@
 # Dockerfile para Backend - OloTrainer
-FROM node:18
+FROM node:18-slim
 
 # Establecer directorio de trabajo
 WORKDIR /app
