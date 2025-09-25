@@ -1,5 +1,8 @@
 # Dockerfile para Backend - OloTrainer
-FROM node:18-slim
+FROM alpine:3.18
+
+# Instalar Node.js y npm desde los repositorios de Alpine
+RUN apk add --no-cache nodejs npm
 
 # Establecer directorio de trabajo
 WORKDIR /app
