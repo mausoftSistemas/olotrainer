@@ -1,8 +1,7 @@
 # Dockerfile para Backend - OloTrainer
-# Usar registry alternativo para evitar límites de Docker Hub
-FROM ghcr.io/library/node:18-alpine
+FROM node:18-alpine
 
-# Nota: Usando GitHub Container Registry como alternativa a Docker Hub
+# Usar imagen oficial de Node.js con Alpine
 
 # Establecer directorio de trabajo
 WORKDIR /app
