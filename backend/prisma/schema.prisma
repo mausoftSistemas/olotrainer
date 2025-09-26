@@ -59,6 +59,9 @@ model User {
   // Integraciones externas
   integrations UserIntegration[]
 
+  // Plantillas de entrenamiento creadas
+  workoutTemplates WorkoutTemplate[]
+
   @@map("users")
 }
 
@@ -144,6 +147,9 @@ model WorkoutTemplate {
   // Uso
   isPublic  Boolean @default(false)
   usageCount Int    @default(0)
+  
+  // Entrenamientos basados en esta plantilla
+  workouts Workout[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
