@@ -25,7 +25,7 @@ router.get('/templates', [
   query('search').optional().isString(),
   query('category').optional().isString(),
   query('difficulty').optional().isIn(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -41,7 +41,7 @@ router.get('/templates', [
     const skip = (page - 1) * limit;
 
     const where: any = {
-      createdBy: req.user.id,
+      creatorId: req.user.id,
     };
 
     if (search) {
@@ -72,7 +72,6 @@ router.get('/templates', [
           category: true,
           difficulty: true,
           estimatedDuration: true,
-          targetMuscleGroups: true,
           equipment: true,
           createdAt: true,
           updatedAt: true,
@@ -100,7 +99,7 @@ router.get('/templates', [
           },
           _count: {
             select: {
-              assignments: true,
+              workouts: true,
             }
           }
         }
@@ -140,7 +139,7 @@ router.post('/templates', [
     }
     return true;
   }),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -173,9 +172,8 @@ router.post('/templates', [
         category,
         difficulty,
         estimatedDuration,
-        targetMuscleGroups,
         equipment,
-        createdBy: req.user.id,
+        creatorId: req.user.id,
         exercises: {
           create: exercises.map((exercise: any, index: number) => ({
             exerciseId: exercise.exerciseId,
@@ -197,7 +195,6 @@ router.post('/templates', [
         category: true,
         difficulty: true,
         estimatedDuration: true,
-        targetMuscleGroups: true,
         equipment: true,
         createdAt: true,
         exercises: {
@@ -245,7 +242,7 @@ router.post('/templates', [
 router.get('/templates/:templateId', [
   authMiddleware,
   param('templateId').isUUID(),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -264,9 +261,8 @@ router.get('/templates/:templateId', [
         category: true,
         difficulty: true,
         estimatedDuration: true,
-        targetMuscleGroups: true,
         equipment: true,
-        createdBy: true,
+        creatorId: true,
         createdAt: true,
         updatedAt: true,
         exercises: {
@@ -296,7 +292,7 @@ router.get('/templates/:templateId', [
         },
         _count: {
           select: {
-            assignments: true,
+            workouts: true,
           }
         }
       }
@@ -307,7 +303,7 @@ router.get('/templates/:templateId', [
     }
 
     // Check if user can access this template
-    if (template.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+    if (template.creatorId !== req.user.id && req.user.role !== 'ADMIN') {
       throw new ForbiddenError('No tienes permisos para ver esta plantilla');
     }
 
@@ -330,7 +326,7 @@ router.put('/templates/:templateId', [
   body('estimatedDuration').optional().isInt({ min: 1 }),
   body('targetMuscleGroups').optional().isArray(),
   body('equipment').optional().isArray(),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -342,15 +338,15 @@ router.put('/templates/:templateId', [
 
     // Check if template exists and user owns it
     const existingTemplate = await prisma.workoutTemplate.findUnique({
-      where: { id: templateId },
-      select: { id: true, createdBy: true }
+      where: { id: templateId as string },
+      select: { id: true, creatorId: true }
     });
 
     if (!existingTemplate) {
       throw new NotFoundError('Plantilla de entrenamiento no encontrada');
     }
 
-    if (existingTemplate.createdBy !== req.user.id) {
+    if (existingTemplate.creatorId !== req.user.id) {
       throw new ForbiddenError('No tienes permisos para editar esta plantilla');
     }
 
@@ -361,7 +357,6 @@ router.put('/templates/:templateId', [
       category,
       difficulty,
       estimatedDuration,
-      targetMuscleGroups,
       equipment,
     } = req.body;
 
@@ -370,11 +365,10 @@ router.put('/templates/:templateId', [
     if (category !== undefined) updateData.category = category;
     if (difficulty !== undefined) updateData.difficulty = difficulty;
     if (estimatedDuration !== undefined) updateData.estimatedDuration = estimatedDuration;
-    if (targetMuscleGroups !== undefined) updateData.targetMuscleGroups = targetMuscleGroups;
     if (equipment !== undefined) updateData.equipment = equipment;
 
     const template = await prisma.workoutTemplate.update({
-      where: { id: templateId },
+      where: { id: templateId as string },
       data: updateData,
       select: {
         id: true,
@@ -383,7 +377,6 @@ router.put('/templates/:templateId', [
         category: true,
         difficulty: true,
         estimatedDuration: true,
-        targetMuscleGroups: true,
         equipment: true,
         updatedAt: true,
       }
@@ -409,7 +402,7 @@ router.delete('/templates/:templateId', [
   authMiddleware,
   requireCoach,
   param('templateId').isUUID(),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -421,14 +414,14 @@ router.delete('/templates/:templateId', [
 
     // Check if template exists and user owns it
     const template = await prisma.workoutTemplate.findUnique({
-      where: { id: templateId },
+      where: { id: templateId as string },
       select: {
         id: true,
-        createdBy: true,
-        _count: {
-          select: {
+        creatorId: true,
+        workouts: {
+          where: {
             assignments: {
-              where: {
+              some: {
                 status: { in: ['ASSIGNED', 'IN_PROGRESS'] }
               }
             }
@@ -441,16 +434,16 @@ router.delete('/templates/:templateId', [
       throw new NotFoundError('Plantilla de entrenamiento no encontrada');
     }
 
-    if (template.createdBy !== req.user.id) {
+    if (template.creatorId !== req.user.id) {
       throw new ForbiddenError('No tienes permisos para eliminar esta plantilla');
     }
 
-    if (template._count.assignments > 0) {
+    if (template.workouts.length > 0) {
       throw new ValidationError('No se puede eliminar una plantilla que tiene asignaciones activas');
     }
 
     await prisma.workoutTemplate.delete({
-      where: { id: templateId }
+      where: { id: templateId as string }
     });
 
     logger.info('Workout template deleted', {
@@ -476,7 +469,7 @@ router.post('/assign', [
   body('scheduledDate').isISO8601(),
   body('notes').optional().isString().isLength({ max: 500 }),
   body('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH']),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -501,10 +494,10 @@ router.post('/assign', [
 
     // Verify template exists and belongs to coach
     const template = await prisma.workoutTemplate.findUnique({
-      where: { id: templateId },
+      where: { id: templateId as string },
       select: {
         id: true,
-        createdBy: true,
+        creatorId: true,
         name: true,
         estimatedDuration: true,
       }
@@ -514,15 +507,25 @@ router.post('/assign', [
       throw new NotFoundError('Plantilla de entrenamiento no encontrada');
     }
 
-    if (template.createdBy !== req.user.id) {
+    if (template.creatorId !== req.user.id) {
       throw new ForbiddenError('No tienes permisos para asignar esta plantilla');
     }
 
+    // Create workout from template first
+    const workout = await prisma.workout.create({
+      data: {
+        name: template.name,
+        creatorId: req.user.id,
+        workoutTemplateId: templateId,
+        estimatedDuration: template.estimatedDuration,
+        status: 'PLANNED',
+      }
+    });
+
     const assignment = await prisma.workoutAssignment.create({
       data: {
-        templateId,
+        workoutId: workout.id,
         athleteId,
-        coachId: req.user.id,
         scheduledDate: new Date(scheduledDate),
         notes,
         priority,
@@ -535,7 +538,7 @@ router.post('/assign', [
         priority: true,
         status: true,
         createdAt: true,
-        template: {
+        workout: {
           select: {
             id: true,
             name: true,
@@ -595,7 +598,7 @@ router.get('/assignments', [
   query('athleteId').optional().isUUID(),
   query('from').optional().isISO8601(),
   query('to').optional().isISO8601(),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -607,8 +610,8 @@ router.get('/assignments', [
     const limit = parseInt(req.query.limit as string) || 20;
     const status = req.query.status as string;
     const athleteId = req.query.athleteId as string;
-    const from = req.query.from as string;
-    const to = req.query.to as string;
+    const from = req.query['from'] as string;
+    const to = req.query['to'] as string;
     const skip = (page - 1) * limit;
 
     const where: any = {};
