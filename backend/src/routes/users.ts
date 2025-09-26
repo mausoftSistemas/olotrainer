@@ -17,13 +17,13 @@ const validateRequest = (req: express.Request) => {
 };
 
 // GET /api/users/profile/:userId?
-router.get('/profile/:userId?', authMiddleware, async (req: AuthenticatedRequest, res) => {
+router.get('/profile/:userId?', authMiddleware, async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     if (!req.user) {
       throw new Error('Usuario no autenticado');
     }
 
-    const targetUserId = req.params.userId || req.user.id;
+    const targetUserId = req.params['userId'] || req.user.id;
     const isOwnProfile = targetUserId === req.user.id;
 
     // Check if user can view this profile
@@ -126,7 +126,7 @@ router.put('/profile', [
   body('vo2Max').optional().isFloat({ min: 10, max: 100 }),
   body('isPublic').optional().isBoolean(),
   body('allowMessages').optional().isBoolean(),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -231,7 +231,7 @@ router.get('/athletes', [
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('search').optional().isString(),
   query('status').optional().isIn(['PENDING', 'ACTIVE', 'INACTIVE']),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -239,10 +239,10 @@ router.get('/athletes', [
       throw new Error('Usuario no autenticado');
     }
 
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const search = req.query.search as string;
-    const status = req.query.status as string || 'ACTIVE';
+    const page = parseInt(req.query['page'] as string) || 1;
+    const limit = parseInt(req.query['limit'] as string) || 20;
+    const search = req.query['search'] as string;
+    const status = req.query['status'] as string || 'ACTIVE';
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -324,7 +324,7 @@ router.post('/invite-athlete', [
   requireCoach,
   body('email').isEmail().normalizeEmail(),
   body('message').optional().isString().isLength({ max: 500 }),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -417,7 +417,7 @@ router.post('/respond-invitation/:relationId', [
   authMiddleware,
   param('relationId').isUUID(),
   body('accept').isBoolean(),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -511,7 +511,7 @@ router.get('/search', [
   query('q').isString().isLength({ min: 2 }),
   query('type').optional().isIn(['COACH', 'ATHLETE']),
   query('limit').optional().isInt({ min: 1, max: 50 }),
-], async (req: AuthenticatedRequest, res) => {
+], async (req: AuthenticatedRequest, res: express.Response) => {
   try {
     validateRequest(req);
 
@@ -519,9 +519,9 @@ router.get('/search', [
       throw new Error('Usuario no autenticado');
     }
 
-    const query = req.query.q as string;
-    const type = req.query.type as string;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const query = req.query['q'] as string;
+    const type = req.query['type'] as string;
+    const limit = parseInt(req.query['limit'] as string) || 20;
 
     const where: any = {
       AND: [

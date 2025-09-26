@@ -33,11 +33,11 @@ router.get('/templates', [
       throw new Error('Usuario no autenticado');
     }
 
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const search = req.query.search as string;
-    const category = req.query.category as string;
-    const difficulty = req.query.difficulty as string;
+    const page = parseInt(req.query['page'] as string) || 1;
+    const limit = parseInt(req.query['limit'] as string) || 20;
+    const search = req.query['search'] as string;
+    const category = req.query['category'] as string;
+    const difficulty = req.query['difficulty'] as string;
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -606,10 +606,10 @@ router.get('/assignments', [
       throw new Error('Usuario no autenticado');
     }
 
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const status = req.query.status as string;
-    const athleteId = req.query.athleteId as string;
+    const page = parseInt(req.query['page'] as string) || 1;
+    const limit = parseInt(req.query['limit'] as string) || 20;
+    const status = req.query['status'] as string;
+    const athleteId = req.query['athleteId'] as string;
     const from = req.query['from'] as string;
     const to = req.query['to'] as string;
     const skip = (page - 1) * limit;
