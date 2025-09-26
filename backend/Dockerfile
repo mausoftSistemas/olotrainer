@@ -1,5 +1,5 @@
 # Dockerfile para Backend - OloTrainer
-FROM docker.mirrors.ustc.edu.cn/library/alpine:3.18
+FROM alpine:3.18
 
 # Instalar Node.js y npm desde los repositorios de Alpine
 RUN apk add --no-cache nodejs npm
