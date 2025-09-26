@@ -9,8 +9,8 @@ WORKDIR /app
 # Copiar archivos de dependencias
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm install --omit=dev
+# Instalar todas las dependencias (incluyendo devDependencies para el build)
+RUN npm install
 
 # Copiar código fuente
 COPY . .
@@ -20,6 +20,9 @@ RUN npx prisma generate
 
 # Compilar TypeScript
 RUN npm run build
+
+# Limpiar devDependencies después del build para reducir el tamaño de la imagen
+RUN npm prune --omit=dev
 
 # Exponer puerto
 EXPOSE 3001
